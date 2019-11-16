@@ -2,12 +2,6 @@ package main
 
 import "fmt"
 
-type tile struct {
-	letter byte
-	count  int
-	value  int
-}
-
 type squareCoordinate struct {
 	row int
 	col int
@@ -91,14 +85,6 @@ var squareTypes = map[string]squareType{
 	},
 }
 
-func createScrabbleBoard() scrabbleBoard {
-	board := scrabbleBoard{}
-
-	board.initializeSquares()
-
-	return board
-}
-
 func (sb *scrabbleBoard) initializeSquares() {
 
 	// Initialize board with plain squares
@@ -134,7 +120,7 @@ func (sb *scrabbleBoard) initializeSquares() {
 	}
 }
 
-func (sb scrabbleBoard) printBoard() {
+func (sb scrabbleBoard) print() {
 	for _, row := range sb {
 		for _, col := range row {
 			fmt.Print(col.squareType + " ")
