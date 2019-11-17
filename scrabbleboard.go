@@ -85,7 +85,7 @@ var squareTypes = map[string]squareType{
 	},
 }
 
-func (sb *scrabbleBoard) initializeSquares() {
+func (sb *scrabbleBoard) initialize() {
 
 	// Initialize board with plain squares
 	for i, row := range sb {

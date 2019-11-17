@@ -1,5 +1,12 @@
 package main
 
+import (
+	"errors"
+	"fmt"
+	"math/rand"
+	"time"
+)
+
 type tile struct {
 	letter byte
 	count  int
@@ -38,19 +45,69 @@ var tiles = map[byte]tile{
 
 type player struct {
 	name  string
-	tiles []tile
+	tiles []byte
 	score int
 }
 
+type tileBag []byte
+
 type scrabbleGame struct {
-	board   scrabbleBoard
-	tileBag []tile
+	board scrabbleBoard
+	tileBag
 	players []player
 }
 
-func createScrabbleGame() scrabbleGame {
-	game := scrabbleGame{}
-	game.board.initializeSquares()
+func createScrabbleGame(playerNames []string) (scrabbleGame, error) {
 
-	return game
+	game := scrabbleGame{}
+
+	if len(playerNames) < 2 || len(playerNames) > 4 {
+		return game, errors.New("Player count must be between 2 and 4")
+	}
+
+	// Initialize squares on board
+	game.board.initialize()
+
+	// Populate tile bag
+	for t := range tiles {
+		for i := 0; i < tiles[t].count; i++ {
+			game.tileBag = append(game.tileBag, t)
+		}
+	}
+
+	// Shuffle tile bag
+	game.tileBag.shuffle()
+
+	// Create players
+	for _, name := range playerNames {
+		game.newPlayer(name)
+	}
+
+	return game, nil
+}
+
+func (sg *scrabbleGame) newPlayer(playerName string) {
+	var p player
+	p.name = playerName
+	_ = dealTiles(&p, &sg.tileBag, 7)
+	sg.players = append(sg.players, p)
+}
+
+func dealTiles(p *player, tb *tileBag, tileCount int) []byte {
+	var tilesDealt []byte
+	tilesDealt, *tb = (*tb)[:tileCount], (*tb)[tileCount:]
+	p.tiles = append(p.tiles, tilesDealt...)
+	return tilesDealt
+}
+
+func (tb tileBag) shuffle() {
+	source := rand.NewSource(time.Now().UnixNano())
+	r := rand.New(source)
+	r.Shuffle(len(tb), func(i, j int) {
+		tb[i], tb[j] = tb[j], tb[i]
+	})
+}
+
+func (tb tileBag) print() {
+	fmt.Printf("%+v", tb)
 }
