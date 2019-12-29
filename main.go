@@ -20,6 +20,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	game.tileBag.print()
+	printTiles(game.tileBag)
 	fmt.Println("Length of tile bag:", len(game.tileBag))
+
+	for _, player := range game.players {
+		fmt.Print(player.name, ": ")
+		printTiles(player.tiles)
+	}
 }

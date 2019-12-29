@@ -108,6 +108,6 @@ func (tb tileBag) shuffle() {
 	})
 }
 
-func (tb tileBag) print() {
-	fmt.Printf("%+v", tb)
+func printTiles(tiles []byte) {
+	fmt.Println(string(tiles))
 }
