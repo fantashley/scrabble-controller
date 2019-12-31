@@ -1,106 +1,111 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
+
+	"github.com/google/uuid"
 )
 
-type tile struct {
-	letter byte
-	count  int
-	value  int
+type Tile struct {
+	Letter byte `json:"letter"`
+	Count  int  `json:"-"`
+	Value  int  `json:"value"`
 }
 
-var tiles = map[byte]tile{
-	' ': tile{letter: ' ', count: 2, value: 0},
-	'A': tile{letter: 'A', count: 9, value: 1},
-	'B': tile{letter: 'B', count: 2, value: 3},
-	'C': tile{letter: 'C', count: 2, value: 3},
-	'D': tile{letter: 'D', count: 4, value: 2},
-	'E': tile{letter: 'E', count: 12, value: 1},
-	'F': tile{letter: 'F', count: 2, value: 4},
-	'G': tile{letter: 'G', count: 3, value: 2},
-	'H': tile{letter: 'H', count: 2, value: 4},
-	'I': tile{letter: 'I', count: 9, value: 1},
-	'J': tile{letter: 'J', count: 1, value: 8},
-	'K': tile{letter: 'K', count: 1, value: 5},
-	'L': tile{letter: 'L', count: 4, value: 1},
-	'M': tile{letter: 'M', count: 2, value: 3},
-	'N': tile{letter: 'N', count: 6, value: 1},
-	'O': tile{letter: 'O', count: 8, value: 1},
-	'P': tile{letter: 'P', count: 2, value: 3},
-	'Q': tile{letter: 'Q', count: 1, value: 10},
-	'R': tile{letter: 'R', count: 6, value: 1},
-	'S': tile{letter: 'S', count: 4, value: 1},
-	'T': tile{letter: 'T', count: 6, value: 1},
-	'U': tile{letter: 'U', count: 4, value: 1},
-	'V': tile{letter: 'V', count: 2, value: 4},
-	'W': tile{letter: 'W', count: 2, value: 4},
-	'X': tile{letter: 'X', count: 1, value: 8},
-	'Y': tile{letter: 'Y', count: 2, value: 4},
-	'Z': tile{letter: 'Z', count: 1, value: 10},
+var tiles = map[byte]Tile{
+	' ': Tile{Letter: ' ', Count: 2, Value: 0},
+	'A': Tile{Letter: 'A', Count: 9, Value: 1},
+	'B': Tile{Letter: 'B', Count: 2, Value: 3},
+	'C': Tile{Letter: 'C', Count: 2, Value: 3},
+	'D': Tile{Letter: 'D', Count: 4, Value: 2},
+	'E': Tile{Letter: 'E', Count: 12, Value: 1},
+	'F': Tile{Letter: 'F', Count: 2, Value: 4},
+	'G': Tile{Letter: 'G', Count: 3, Value: 2},
+	'H': Tile{Letter: 'H', Count: 2, Value: 4},
+	'I': Tile{Letter: 'I', Count: 9, Value: 1},
+	'J': Tile{Letter: 'J', Count: 1, Value: 8},
+	'K': Tile{Letter: 'K', Count: 1, Value: 5},
+	'L': Tile{Letter: 'L', Count: 4, Value: 1},
+	'M': Tile{Letter: 'M', Count: 2, Value: 3},
+	'N': Tile{Letter: 'N', Count: 6, Value: 1},
+	'O': Tile{Letter: 'O', Count: 8, Value: 1},
+	'P': Tile{Letter: 'P', Count: 2, Value: 3},
+	'Q': Tile{Letter: 'Q', Count: 1, Value: 10},
+	'R': Tile{Letter: 'R', Count: 6, Value: 1},
+	'S': Tile{Letter: 'S', Count: 4, Value: 1},
+	'T': Tile{Letter: 'T', Count: 6, Value: 1},
+	'U': Tile{Letter: 'U', Count: 4, Value: 1},
+	'V': Tile{Letter: 'V', Count: 2, Value: 4},
+	'W': Tile{Letter: 'W', Count: 2, Value: 4},
+	'X': Tile{Letter: 'X', Count: 1, Value: 8},
+	'Y': Tile{Letter: 'Y', Count: 2, Value: 4},
+	'Z': Tile{Letter: 'Z', Count: 1, Value: 10},
 }
 
-type player struct {
-	name  string
-	tiles []byte
-	score int
+type Player struct {
+	ID    string `json:"-"`
+	Name  string `json:"name"`
+	Tiles []byte `json:"-"`
+	Score int    `json:"score"`
 }
 
-type tileBag []byte
+type TileBag []byte
 
-type scrabbleGame struct {
-	board scrabbleBoard
-	tileBag
-	players []player
+var initializedTileBag = initializeTileBag()
+
+type ScrabbleGame struct {
+	ID      uuid.UUID     `json:"id"`
+	Board   ScrabbleBoard `json:"board"`
+	TileBag `json:"tilebag"`
+	Players []Player `json:"players"`
 }
 
-func createScrabbleGame(playerNames []string) (scrabbleGame, error) {
+func createScrabbleGame() ScrabbleGame {
 
-	game := scrabbleGame{}
+	game := ScrabbleGame{}
 
-	if len(playerNames) < 2 || len(playerNames) > 4 {
-		return game, errors.New("Player count must be between 2 and 4")
-	}
+	game.ID = uuid.New()
 
 	// Initialize squares on board
-	game.board.initialize()
+	game.Board = initializedBoard
 
 	// Populate tile bag
-	for t := range tiles {
-		for i := 0; i < tiles[t].count; i++ {
-			game.tileBag = append(game.tileBag, t)
-		}
-	}
+	game.TileBag = make(TileBag, len(initializedTileBag))
+	copy(game.TileBag, initializedTileBag)
 
 	// Shuffle tile bag
-	game.tileBag.shuffle()
+	game.TileBag.shuffle()
 
-	// Create players
-	for _, name := range playerNames {
-		game.newPlayer(name)
-	}
-
-	return game, nil
+	return game
 }
 
-func (sg *scrabbleGame) newPlayer(playerName string) {
-	var p player
-	p.name = playerName
-	_ = dealTiles(&p, &sg.tileBag, 7)
-	sg.players = append(sg.players, p)
+func (sg *ScrabbleGame) newPlayer(playerName string) {
+	var p Player
+	p.Name = playerName
+	_ = dealTiles(&p, &sg.TileBag, 7)
+	sg.Players = append(sg.Players, p)
 }
 
-func dealTiles(p *player, tb *tileBag, tileCount int) []byte {
+func dealTiles(p *Player, tb *TileBag, tileCount int) []byte {
 	var tilesDealt []byte
 	tilesDealt, *tb = (*tb)[:tileCount], (*tb)[tileCount:]
-	p.tiles = append(p.tiles, tilesDealt...)
+	p.Tiles = append(p.Tiles, tilesDealt...)
 	return tilesDealt
 }
 
-func (tb tileBag) shuffle() {
+func initializeTileBag() TileBag {
+	bag := TileBag{}
+	for t := range tiles {
+		for i := 0; i < tiles[t].Count; i++ {
+			bag = append(bag, t)
+		}
+	}
+	return bag
+}
+
+func (tb TileBag) shuffle() {
 	source := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(source)
 	r.Shuffle(len(tb), func(i, j int) {

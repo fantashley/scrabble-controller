@@ -7,42 +7,44 @@ type squareCoordinate struct {
 	col int
 }
 
-type squareType struct {
-	name             string
-	letterMultiplier int
-	wordMultiplier   int
-	coordinates      []squareCoordinate
+type SquareType struct {
+	Name             string             `json:"name"`
+	LetterMultiplier int                `json:"letterMultiplier"`
+	WordMultiplier   int                `json:"wordMultiplier"`
+	Coordinates      []squareCoordinate `json:"-"`
 }
 
-type square struct {
-	squareType string
-	tile
+type Square struct {
+	SquareType string `json:"type"`
+	Tile       `json:"tile,omitempty"`
 }
 
 const rowCount int = 15
 const columnCount int = 15
 
-type scrabbleBoard [rowCount][columnCount]square
+type ScrabbleBoard [rowCount][columnCount]Square
 
-var squareTypes = map[string]squareType{
-	"plain": squareType{
-		name:             "plain",
-		letterMultiplier: 1,
-		wordMultiplier:   1,
+var initializedBoard = initializeScrabbleBoard()
+
+var squareTypes = map[string]SquareType{
+	"plain": SquareType{
+		Name:             "plain",
+		LetterMultiplier: 1,
+		WordMultiplier:   1,
 	},
-	"star": squareType{
-		name:             "star",
-		letterMultiplier: 1,
-		wordMultiplier:   1,
-		coordinates: []squareCoordinate{
+	"star": SquareType{
+		Name:             "star",
+		LetterMultiplier: 1,
+		WordMultiplier:   1,
+		Coordinates: []squareCoordinate{
 			squareCoordinate{row: 7, col: 7},
 		},
 	},
-	"doubleLetter": squareType{
-		name:             "doubleLetter",
-		letterMultiplier: 2,
-		wordMultiplier:   1,
-		coordinates: []squareCoordinate{
+	"doubleLetter": SquareType{
+		Name:             "doubleLetter",
+		LetterMultiplier: 2,
+		WordMultiplier:   1,
+		Coordinates: []squareCoordinate{
 			squareCoordinate{row: 0, col: 3},
 			squareCoordinate{row: 2, col: 6},
 			squareCoordinate{row: 3, col: 0},
@@ -52,32 +54,32 @@ var squareTypes = map[string]squareType{
 			squareCoordinate{row: 7, col: 3},
 		},
 	},
-	"doubleWord": squareType{
-		name:             "doubleWord",
-		letterMultiplier: 1,
-		wordMultiplier:   2,
-		coordinates: []squareCoordinate{
+	"doubleWord": SquareType{
+		Name:             "doubleWord",
+		LetterMultiplier: 1,
+		WordMultiplier:   2,
+		Coordinates: []squareCoordinate{
 			squareCoordinate{row: 1, col: 1},
 			squareCoordinate{row: 2, col: 2},
 			squareCoordinate{row: 3, col: 3},
 			squareCoordinate{row: 4, col: 4},
 		},
 	},
-	"tripleLetter": squareType{
-		name:             "tripleLetter",
-		letterMultiplier: 3,
-		wordMultiplier:   1,
-		coordinates: []squareCoordinate{
+	"tripleLetter": SquareType{
+		Name:             "tripleLetter",
+		LetterMultiplier: 3,
+		WordMultiplier:   1,
+		Coordinates: []squareCoordinate{
 			squareCoordinate{row: 1, col: 5},
 			squareCoordinate{row: 5, col: 1},
 			squareCoordinate{row: 5, col: 5},
 		},
 	},
-	"tripleWord": squareType{
-		name:             "tripleWord",
-		letterMultiplier: 1,
-		wordMultiplier:   3,
-		coordinates: []squareCoordinate{
+	"tripleWord": SquareType{
+		Name:             "tripleWord",
+		LetterMultiplier: 1,
+		WordMultiplier:   3,
+		Coordinates: []squareCoordinate{
 			squareCoordinate{row: 0, col: 0},
 			squareCoordinate{row: 0, col: 7},
 			squareCoordinate{row: 7, col: 0},
@@ -85,13 +87,15 @@ var squareTypes = map[string]squareType{
 	},
 }
 
-func (sb *scrabbleBoard) initialize() {
+func initializeScrabbleBoard() ScrabbleBoard {
+
+	sb := ScrabbleBoard{}
 
 	// Initialize board with plain squares
 	for i, row := range sb {
 		for j := range row {
-			sb[i][j] = square{
-				squareType: "plain",
+			sb[i][j] = Square{
+				SquareType: "plain",
 			}
 		}
 	}
@@ -99,10 +103,10 @@ func (sb *scrabbleBoard) initialize() {
 	// Place remaining squares based on coordinates
 	for s := range squareTypes {
 		st := squareTypes[s]
-		for _, sc := range st.coordinates {
+		for _, sc := range st.Coordinates {
 
-			squ := square{
-				squareType: st.name,
+			squ := Square{
+				SquareType: st.Name,
 			}
 
 			// Quadrant 1
@@ -118,12 +122,14 @@ func (sb *scrabbleBoard) initialize() {
 			sb[rowCount-1-sc.row][columnCount-1-sc.col] = squ
 		}
 	}
+
+	return sb
 }
 
-func (sb scrabbleBoard) print() {
+func (sb ScrabbleBoard) print() {
 	for _, row := range sb {
 		for _, col := range row {
-			fmt.Print(col.squareType + " ")
+			fmt.Print(col.SquareType + " ")
 		}
 		fmt.Println()
 	}
