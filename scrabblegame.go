@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,10 +46,10 @@ var tiles = map[byte]Tile{
 }
 
 type Player struct {
-	ID    string `json:"-"`
-	Name  string `json:"name"`
-	Tiles []byte `json:"-"`
-	Score int    `json:"score"`
+	ID    uuid.UUID `json:"-"`
+	Name  string    `json:"name"`
+	Tiles []byte    `json:"-"`
+	Score int       `json:"score"`
 }
 
 type TileBag []byte
@@ -56,10 +57,11 @@ type TileBag []byte
 var initializedTileBag = initializeTileBag()
 
 type ScrabbleGame struct {
-	ID      uuid.UUID     `json:"id"`
-	Board   ScrabbleBoard `json:"board"`
-	TileBag `json:"tilebag"`
-	Players []Player `json:"players"`
+	ID       uuid.UUID     `json:"id"`
+	Board    ScrabbleBoard `json:"board"`
+	TileBag  `json:"tilebag"`
+	PlayerMu sync.Mutex `json:"-"`
+	Players  []*Player  `json:"players"`
 }
 
 func createScrabbleGame() ScrabbleGame {
@@ -79,13 +81,6 @@ func createScrabbleGame() ScrabbleGame {
 	game.TileBag.shuffle()
 
 	return game
-}
-
-func (sg *ScrabbleGame) newPlayer(playerName string) {
-	var p Player
-	p.Name = playerName
-	_ = dealTiles(&p, &sg.TileBag, 7)
-	sg.Players = append(sg.Players, p)
 }
 
 func dealTiles(p *Player, tb *TileBag, tileCount int) []byte {
