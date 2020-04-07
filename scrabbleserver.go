@@ -66,6 +66,7 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	j.Player.ID = uuid.New()
+	j.PlayerID = j.Player.ID
 
 	serverMu.Lock()
 	if g, ok = server.activeGames[j.GameID]; !ok {

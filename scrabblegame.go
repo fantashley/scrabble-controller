@@ -57,7 +57,7 @@ type TileBag []byte
 var initializedTileBag = initializeTileBag()
 
 type ScrabbleGame struct {
-	ID       uuid.UUID     `json:"id"`
+	ID       uuid.UUID     `json:"game_id"`
 	Board    ScrabbleBoard `json:"board"`
 	TileBag  `json:"tilebag"`
 	PlayerMu sync.Mutex `json:"-"`
