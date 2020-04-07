@@ -78,6 +78,11 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	serverMu.Unlock()
 
 	g.PlayerMu.Lock()
+	if len(g.Players) == 4 {
+		g.PlayerMu.Unlock()
+		http.Error(w, "Maximum players reached for game", http.StatusBadRequest)
+		return
+	}
 	g.Players = append(g.Players, &(j.Player))
 	g.PlayerMu.Unlock()
 

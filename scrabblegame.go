@@ -108,6 +108,13 @@ func (tb TileBag) shuffle() {
 	})
 }
 
+func (sg *ScrabbleGame) getPlayers() []*Player {
+	sg.PlayerMu.Lock()
+	players := sg.Players
+	sg.PlayerMu.Unlock()
+	return players
+}
+
 func printTiles(tiles []byte) {
 	fmt.Println(string(tiles))
 }
