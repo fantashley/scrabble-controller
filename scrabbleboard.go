@@ -2,16 +2,16 @@ package main
 
 import "fmt"
 
-type squareCoordinate struct {
-	row int
-	col int
+type SquareCoordinate struct {
+	Row int `json:"row"`
+	Col int `json:"col"`
 }
 
 type SquareType struct {
 	Name             string             `json:"name"`
 	LetterMultiplier int                `json:"letterMultiplier"`
 	WordMultiplier   int                `json:"wordMultiplier"`
-	Coordinates      []squareCoordinate `json:"-"`
+	Coordinates      []SquareCoordinate `json:"-"`
 }
 
 type Square struct {
@@ -36,53 +36,53 @@ var squareTypes = map[string]SquareType{
 		Name:             "star",
 		LetterMultiplier: 1,
 		WordMultiplier:   1,
-		Coordinates: []squareCoordinate{
-			squareCoordinate{row: 7, col: 7},
+		Coordinates: []SquareCoordinate{
+			SquareCoordinate{Row: 7, Col: 7},
 		},
 	},
 	"doubleLetter": SquareType{
 		Name:             "doubleLetter",
 		LetterMultiplier: 2,
 		WordMultiplier:   1,
-		Coordinates: []squareCoordinate{
-			squareCoordinate{row: 0, col: 3},
-			squareCoordinate{row: 2, col: 6},
-			squareCoordinate{row: 3, col: 0},
-			squareCoordinate{row: 3, col: 7},
-			squareCoordinate{row: 6, col: 2},
-			squareCoordinate{row: 6, col: 6},
-			squareCoordinate{row: 7, col: 3},
+		Coordinates: []SquareCoordinate{
+			SquareCoordinate{Row: 0, Col: 3},
+			SquareCoordinate{Row: 2, Col: 6},
+			SquareCoordinate{Row: 3, Col: 0},
+			SquareCoordinate{Row: 3, Col: 7},
+			SquareCoordinate{Row: 6, Col: 2},
+			SquareCoordinate{Row: 6, Col: 6},
+			SquareCoordinate{Row: 7, Col: 3},
 		},
 	},
 	"doubleWord": SquareType{
 		Name:             "doubleWord",
 		LetterMultiplier: 1,
 		WordMultiplier:   2,
-		Coordinates: []squareCoordinate{
-			squareCoordinate{row: 1, col: 1},
-			squareCoordinate{row: 2, col: 2},
-			squareCoordinate{row: 3, col: 3},
-			squareCoordinate{row: 4, col: 4},
+		Coordinates: []SquareCoordinate{
+			SquareCoordinate{Row: 1, Col: 1},
+			SquareCoordinate{Row: 2, Col: 2},
+			SquareCoordinate{Row: 3, Col: 3},
+			SquareCoordinate{Row: 4, Col: 4},
 		},
 	},
 	"tripleLetter": SquareType{
 		Name:             "tripleLetter",
 		LetterMultiplier: 3,
 		WordMultiplier:   1,
-		Coordinates: []squareCoordinate{
-			squareCoordinate{row: 1, col: 5},
-			squareCoordinate{row: 5, col: 1},
-			squareCoordinate{row: 5, col: 5},
+		Coordinates: []SquareCoordinate{
+			SquareCoordinate{Row: 1, Col: 5},
+			SquareCoordinate{Row: 5, Col: 1},
+			SquareCoordinate{Row: 5, Col: 5},
 		},
 	},
 	"tripleWord": SquareType{
 		Name:             "tripleWord",
 		LetterMultiplier: 1,
 		WordMultiplier:   3,
-		Coordinates: []squareCoordinate{
-			squareCoordinate{row: 0, col: 0},
-			squareCoordinate{row: 0, col: 7},
-			squareCoordinate{row: 7, col: 0},
+		Coordinates: []SquareCoordinate{
+			SquareCoordinate{Row: 0, Col: 0},
+			SquareCoordinate{Row: 0, Col: 7},
+			SquareCoordinate{Row: 7, Col: 0},
 		},
 	},
 }
@@ -110,16 +110,16 @@ func initializeScrabbleBoard() ScrabbleBoard {
 			}
 
 			// Quadrant 1
-			sb[sc.row][columnCount-1-sc.col] = squ
+			sb[sc.Row][columnCount-1-sc.Col] = squ
 
 			// Quadrant 2
-			sb[sc.row][sc.col] = squ
+			sb[sc.Row][sc.Col] = squ
 
 			// Quadrant 3
-			sb[rowCount-1-sc.row][sc.col] = squ
+			sb[rowCount-1-sc.Row][sc.Col] = squ
 
 			// Quadrant 4
-			sb[rowCount-1-sc.row][columnCount-1-sc.col] = squ
+			sb[rowCount-1-sc.Row][columnCount-1-sc.Col] = squ
 		}
 	}
 

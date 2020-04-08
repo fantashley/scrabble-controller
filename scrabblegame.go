@@ -46,10 +46,12 @@ var tiles = map[byte]Tile{
 }
 
 type Player struct {
-	ID    uuid.UUID `json:"-"`
-	Name  string    `json:"name"`
-	Tiles []byte    `json:"-"`
-	Score int       `json:"score"`
+	ID     uuid.UUID              `json:"-"`
+	Name   string                 `json:"name"`
+	Number int                    `json:"number"`
+	Tiles  []byte                 `json:"-"`
+	Score  int                    `json:"score"`
+	State  chan GameStateResponse `json:"-"`
 }
 
 type TileBag []byte
@@ -57,11 +59,15 @@ type TileBag []byte
 var initializedTileBag = initializeTileBag()
 
 type ScrabbleGame struct {
-	ID       uuid.UUID     `json:"game_id"`
-	Board    ScrabbleBoard `json:"board"`
-	TileBag  `json:"tilebag"`
-	PlayerMu sync.Mutex `json:"-"`
-	Players  []*Player  `json:"players"`
+	sync.Mutex
+	ID         uuid.UUID
+	Active     bool
+	Action     chan GamePlayRequest
+	TurnCount  int
+	Board      ScrabbleBoard
+	TileBag    TileBag
+	Players    map[uuid.UUID]*Player
+	PlayerList []*Player
 }
 
 func createScrabbleGame() ScrabbleGame {
@@ -69,6 +75,8 @@ func createScrabbleGame() ScrabbleGame {
 	game := ScrabbleGame{}
 
 	game.ID = uuid.New()
+
+	game.Action = make(chan GamePlayRequest)
 
 	// Initialize squares on board
 	game.Board = initializedBoard
@@ -80,14 +88,15 @@ func createScrabbleGame() ScrabbleGame {
 	// Shuffle tile bag
 	game.TileBag.shuffle()
 
+	game.Players = make(map[uuid.UUID]*Player)
+
 	return game
 }
 
-func dealTiles(p *Player, tb *TileBag, tileCount int) []byte {
+func dealTiles(p *Player, tb *TileBag, tileCount int) {
 	var tilesDealt []byte
 	tilesDealt, *tb = (*tb)[:tileCount], (*tb)[tileCount:]
 	p.Tiles = append(p.Tiles, tilesDealt...)
-	return tilesDealt
 }
 
 func initializeTileBag() TileBag {
@@ -108,11 +117,38 @@ func (tb TileBag) shuffle() {
 	})
 }
 
-func (sg *ScrabbleGame) getPlayers() []*Player {
-	sg.PlayerMu.Lock()
-	players := sg.Players
-	sg.PlayerMu.Unlock()
-	return players
+func (sg *ScrabbleGame) stateController() {
+
+	// Deal tiles to players
+	for p := range sg.Players {
+		dealTiles(sg.Players[p], &sg.TileBag, 7)
+	}
+
+	sg.PlayerList = sg.playerList()
+
+	numPlayers := len(sg.Players)
+
+	for request := range sg.Action {
+		switch request.Play {
+		case false: // Return the game state
+			sg.Players[request.PlayerID].State <- GameStateResponse{
+				GameID:      sg.ID,
+				PlayerID:    request.PlayerID,
+				Players:     sg.PlayerList,
+				Board:       sg.Board,
+				PlayerTurn:  sg.TurnCount % numPlayers,
+				PlayerTiles: sg.Players[request.PlayerID].Tiles,
+			}
+		}
+	}
+}
+
+func (sg *ScrabbleGame) playerList() []*Player {
+	p := make([]*Player, len(sg.Players))
+	for player := range sg.Players {
+		p[sg.Players[player].Number] = sg.Players[player]
+	}
+	return p
 }
 
 func printTiles(tiles []byte) {
