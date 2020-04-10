@@ -14,12 +14,16 @@ type scrabbleServer struct {
 	activeGames map[uuid.UUID]*ScrabbleGame
 }
 
+// GeneralGameRequest is the catch-all request format for client requests that
+// don't require special fields
 type GeneralGameRequest struct {
 	GameID     uuid.UUID  `json:"game_id"`
 	PlayerID   *uuid.UUID `json:"player_id,omitempty"`
 	PlayerName *string    `json:"player_name,omitempty"`
 }
 
+// GameStateResponse is the format of the response sent to clients when they
+// request the current game state
 type GameStateResponse struct {
 	GameID      uuid.UUID     `json:"game_id"`
 	PlayerID    uuid.UUID     `json:"-"`
@@ -29,6 +33,8 @@ type GameStateResponse struct {
 	PlayerTiles []byte        `json:"tiles"`
 }
 
+// GamePlayRequest is the format of the request a client sends when they would
+// like to play their turn
 type GamePlayRequest struct {
 	GameID   uuid.UUID        `json:"game_id"`
 	PlayerID uuid.UUID        `json:"player_id"`
@@ -44,7 +50,9 @@ var (
 	server   scrabbleServer
 )
 
-func startScrabbleServer(bindAddr string) error {
+// StartScrabbleServer is the function that is run to start the Scrabble HTTP
+// server
+func StartScrabbleServer(bindAddr string) error {
 	server.activeGames = make(map[uuid.UUID]*ScrabbleGame)
 
 	r := mux.NewRouter()
@@ -56,6 +64,8 @@ func startScrabbleServer(bindAddr string) error {
 	return http.ListenAndServe(bindAddr, r)
 }
 
+// createGameHandler handles API requests for creating a new Scrabble game
+// instance
 func createGameHandler(w http.ResponseWriter, r *http.Request) {
 	newGame := createScrabbleGame()
 
@@ -78,6 +88,8 @@ func createGameHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(gameData)
 }
 
+// joinGameHandler handles requests from players to join a specified game. It
+// also creates a player and returns their ID to the client.
 func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	var j GeneralGameRequest
 	var g *ScrabbleGame
@@ -88,6 +100,7 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create player to be added to game
 	p := Player{
 		ID:    uuid.New(),
 		Name:  *j.PlayerName,
@@ -95,8 +108,10 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 		State: make(chan GameStateResponse),
 	}
 
+	// Set field in response so player knows their ID
 	j.PlayerID = &p.ID
 
+	// Retrieve the game that matches ID requested
 	g, err = getGame(j.GameID, &w)
 	if err != nil {
 		return
@@ -104,6 +119,7 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 
 	g.Lock()
 	playerCount := len(g.Players)
+	// Check that game is valid to join
 	if playerCount == 4 {
 		g.Unlock()
 		http.Error(w, "Maximum players reached for game", http.StatusBadRequest)
@@ -113,10 +129,13 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Game has already started", http.StatusBadRequest)
 		return
 	}
+	// Assign player their number based on when they joined
 	p.Number = playerCount
+	// Add player to game
 	g.Players[p.ID] = &p
 	g.Unlock()
 
+	// Create response containing game ID and new player ID
 	resp, err := json.Marshal(j)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -128,6 +147,9 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// startGameHandler is a handler that will start a game upon request, marking it
+// as active and no longer joinable by other players. It also kicks off the
+// goroutine for the specified game.
 func startGameHandler(w http.ResponseWriter, r *http.Request) {
 	var j GeneralGameRequest
 	var g *ScrabbleGame
@@ -148,40 +170,48 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 	// Set game to active
 	g.Lock()
 	defer g.Unlock()
+	// Ensure game is eligible to be started
 	if g.Active {
 		http.Error(w, "Game has already started", http.StatusBadRequest)
 		return
-	}
-	if len(g.Players) < 2 {
+	} else if len(g.Players) < 2 {
 		http.Error(w, "At least two players needed to start game", http.StatusBadRequest)
 		return
 	}
 	g.Active = true
 
+	// Start game controller goroutine
 	go g.stateController()
 
 	w.WriteHeader(http.StatusOK)
 }
 
+// gameStateHandler handles requests for the game's current state. It will
+// respond using the GameStateResponse struct.
 func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 	var j GeneralGameRequest
 
+	// Decode game ID and player ID. Player ID is needed so the server knows
+	// which tiles to send for the player's current state.
 	err := json.NewDecoder(r.Body).Decode(&j)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
+	// Retrieve requested game
 	g, err := getGame(j.GameID, &w)
 	if err != nil {
 		return
 	}
 
+	// Send request to game controller
 	g.Action <- GamePlayRequest{
 		GameID:   j.GameID,
 		PlayerID: *j.PlayerID,
 	}
 
+	// Decode response with current game state details from game controller
 	resp, err := json.Marshal(<-g.Players[*j.PlayerID].State)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -193,6 +223,8 @@ func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
+// getGame is a concurrency-safe function that retrieves the requested game
+// instance from the list of active games on the server
 func getGame(gameID uuid.UUID, w *(http.ResponseWriter)) (*ScrabbleGame, error) {
 	var g *ScrabbleGame
 	var ok bool

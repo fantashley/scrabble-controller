@@ -2,18 +2,21 @@ package main
 
 import "fmt"
 
+// SquareCoordinate represents a coordinate of a Scrabble board
 type SquareCoordinate struct {
 	Row int `json:"row"`
 	Col int `json:"col"`
 }
 
+// SquareType represents the underlying types of squares on a Scrabble board
 type SquareType struct {
-	Name             string             `json:"name"`
-	LetterMultiplier int                `json:"letterMultiplier"`
-	WordMultiplier   int                `json:"wordMultiplier"`
-	Coordinates      []SquareCoordinate `json:"-"`
+	Name             string             `json:"name"`             // type of square, such as plain or tripleWord
+	LetterMultiplier int                `json:"letterMultiplier"` // multiplier for letters on square
+	WordMultiplier   int                `json:"wordMultiplier"`   // multiplier for words on square
+	Coordinates      []SquareCoordinate `json:"-"`                // second quadrant symmetrical coordinates for square type
 }
 
+// Square represents the squares on a Scrabble Board
 type Square struct {
 	SquareType string `json:"type"`
 	Tile       `json:"tile,omitempty"`
@@ -22,10 +25,13 @@ type Square struct {
 const rowCount int = 15
 const columnCount int = 15
 
+// ScrabbleBoard represents the board containing a grid of Squares
 type ScrabbleBoard [rowCount][columnCount]Square
 
 var initializedBoard = initializeScrabbleBoard()
 
+// squareTypes is a definition of the possible square types and the values they
+// hold
 var squareTypes = map[string]SquareType{
 	"plain": SquareType{
 		Name:             "plain",
@@ -87,6 +93,7 @@ var squareTypes = map[string]SquareType{
 	},
 }
 
+// initializeScrabbleBoard places the squares on the board
 func initializeScrabbleBoard() ScrabbleBoard {
 
 	sb := ScrabbleBoard{}
@@ -126,6 +133,7 @@ func initializeScrabbleBoard() ScrabbleBoard {
 	return sb
 }
 
+// print outputs the scrabble board square contents
 func (sb ScrabbleBoard) print() {
 	for _, row := range sb {
 		for _, col := range row {

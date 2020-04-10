@@ -9,10 +9,11 @@ import (
 	"github.com/google/uuid"
 )
 
+// Tile represents a Scrabble tile that would be played on a board
 type Tile struct {
-	Letter byte `json:"letter"`
-	Count  int  `json:"-"`
-	Value  int  `json:"value"`
+	Letter byte `json:"letter"` // the character written on the tile
+	Count  int  `json:"-"`      // the number of tiles with the character
+	Value  int  `json:"value"`  // the point value of playing the tile
 }
 
 var tiles = map[byte]Tile{
@@ -45,31 +46,35 @@ var tiles = map[byte]Tile{
 	'Z': Tile{Letter: 'Z', Count: 1, Value: 10},
 }
 
+// Player represents an instance of a player and stores their current state
 type Player struct {
-	ID     uuid.UUID              `json:"-"`
-	Name   string                 `json:"name"`
-	Number int                    `json:"number"`
-	Tiles  []byte                 `json:"-"`
-	Score  int                    `json:"score"`
-	State  chan GameStateResponse `json:"-"`
+	ID     uuid.UUID              `json:"-"`      // unique identifier
+	Name   string                 `json:"name"`   // player's chosen display name
+	Number int                    `json:"number"` // number that dictates their turn
+	Tiles  []byte                 `json:"-"`      // tiles currenty in possession
+	Score  int                    `json:"score"`  // current score in the game
+	State  chan GameStateResponse `json:"-"`      // channel on which to send state
 }
 
+// TileBag represents the bag of undistributed tiles in a game
 type TileBag []byte
 
 var initializedTileBag = initializeTileBag()
 
+// ScrabbleGame represents the state of an active game instance
 type ScrabbleGame struct {
 	sync.Mutex
-	ID         uuid.UUID
-	Active     bool
-	Action     chan GamePlayRequest
-	TurnCount  int
-	Board      ScrabbleBoard
-	TileBag    TileBag
-	Players    map[uuid.UUID]*Player
-	PlayerList []*Player
+	ID         uuid.UUID             // unique identifier
+	Active     bool                  // true if the game has started
+	Action     chan GamePlayRequest  // channel for receiving player's turns
+	TurnCount  int                   // counter that increments for each turn played
+	Board      ScrabbleBoard         // board representation with current tiles
+	TileBag    TileBag               // bag of tiles not yet distributed
+	Players    map[uuid.UUID]*Player // players indexed by UUID
+	PlayerList []*Player             // players ordered by turn for the GameStateResponse
 }
 
+// createScrabbleGame initializes a game instance
 func createScrabbleGame() ScrabbleGame {
 
 	game := ScrabbleGame{}
@@ -93,12 +98,15 @@ func createScrabbleGame() ScrabbleGame {
 	return game
 }
 
+// dealTiles disperses tiles from the tile bag to players so they always have 7
+// tiles in their hand
 func dealTiles(p *Player, tb *TileBag, tileCount int) {
 	var tilesDealt []byte
 	tilesDealt, *tb = (*tb)[:tileCount], (*tb)[tileCount:]
 	p.Tiles = append(p.Tiles, tilesDealt...)
 }
 
+// initializeTileBag fills the tile bag with tiles before the game begins
 func initializeTileBag() TileBag {
 	bag := TileBag{}
 	for t := range tiles {
@@ -109,6 +117,7 @@ func initializeTileBag() TileBag {
 	return bag
 }
 
+// shuffle make sure the tiles are in random order in the tile bag
 func (tb TileBag) shuffle() {
 	source := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(source)
@@ -117,6 +126,8 @@ func (tb TileBag) shuffle() {
 	})
 }
 
+// stateController is the main goroutine for the game that handles state
+// requests and play requests
 func (sg *ScrabbleGame) stateController() {
 
 	// Deal tiles to players
@@ -128,6 +139,7 @@ func (sg *ScrabbleGame) stateController() {
 
 	numPlayers := len(sg.Players)
 
+	// Loop on requests in queue
 	for request := range sg.Action {
 		switch request.Play {
 		case false: // Return the game state
@@ -143,6 +155,8 @@ func (sg *ScrabbleGame) stateController() {
 	}
 }
 
+// playerList generates an ordered list of players for consistency across all
+// clients
 func (sg *ScrabbleGame) playerList() []*Player {
 	p := make([]*Player, len(sg.Players))
 	for player := range sg.Players {
@@ -151,6 +165,7 @@ func (sg *ScrabbleGame) playerList() []*Player {
 	return p
 }
 
+// printTiles prints the tiles in a player's hand
 func printTiles(tiles []byte) {
 	fmt.Println(string(tiles))
 }
