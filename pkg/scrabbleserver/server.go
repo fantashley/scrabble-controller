@@ -112,10 +112,12 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	defer g.Unlock()
 
 	// Set field in response so player knows their ID
-	*j.PlayerID, err = g.addPlayer(*j.PlayerName)
+	playerID, err := g.addPlayer(*j.PlayerName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
+
+	j.PlayerID = &playerID
 
 	// Create response containing game ID and new player ID
 	resp, err := json.Marshal(j)
