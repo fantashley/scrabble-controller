@@ -31,6 +31,7 @@ type GameStateResponse struct {
 	Board       ScrabbleBoard `json:"board"`
 	PlayerTurn  int           `json:"turn"`
 	PlayerTiles []byte        `json:"tiles"`
+	Error       error         `json:"-"`
 }
 
 // GamePlayRequest is the format of the request a client sends when they would
@@ -94,22 +95,12 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	var j GeneralGameRequest
 	var g *ScrabbleGame
 
+	// Decode Game ID
 	err := json.NewDecoder(r.Body).Decode(&j)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	// Create player to be added to game
-	p := Player{
-		ID:    uuid.New(),
-		Name:  *j.PlayerName,
-		Tiles: make([]byte, 0),
-		State: make(chan GameStateResponse),
-	}
-
-	// Set field in response so player knows their ID
-	j.PlayerID = &p.ID
 
 	// Retrieve the game that matches ID requested
 	g, err = getGame(j.GameID, &w)
@@ -118,22 +109,13 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	g.Lock()
-	playerCount := len(g.Players)
-	// Check that game is valid to join
-	if playerCount == 4 {
-		g.Unlock()
-		http.Error(w, "Maximum players reached for game", http.StatusBadRequest)
-		return
-	} else if g.Active {
-		g.Unlock()
-		http.Error(w, "Game has already started", http.StatusBadRequest)
-		return
+	defer g.Unlock()
+
+	// Set field in response so player knows their ID
+	*j.PlayerID, err = g.addPlayer(*j.PlayerName)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	// Assign player their number based on when they joined
-	p.Number = playerCount
-	// Add player to game
-	g.Players[p.ID] = &p
-	g.Unlock()
 
 	// Create response containing game ID and new player ID
 	resp, err := json.Marshal(j)
@@ -167,21 +149,14 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set game to active
+	// Start game
 	g.Lock()
 	defer g.Unlock()
-	// Ensure game is eligible to be started
-	if g.Active {
-		http.Error(w, "Game has already started", http.StatusBadRequest)
-		return
-	} else if len(g.Players) < 2 {
-		http.Error(w, "At least two players needed to start game", http.StatusBadRequest)
+	err = g.start()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	g.Active = true
-
-	// Start game controller goroutine
-	go g.stateController()
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -206,13 +181,13 @@ func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send request to game controller
-	g.Action <- GamePlayRequest{
+	state, err := g.request(GamePlayRequest{
 		GameID:   j.GameID,
 		PlayerID: *j.PlayerID,
-	}
+	})
 
 	// Decode response with current game state details from game controller
-	resp, err := json.Marshal(<-g.Players[*j.PlayerID].State)
+	resp, err := json.Marshal(state)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

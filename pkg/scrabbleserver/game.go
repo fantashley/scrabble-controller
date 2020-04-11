@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 )
 
 // Tile represents a Scrabble tile that would be played on a board
@@ -53,7 +54,8 @@ type Player struct {
 	Number int                    `json:"number"` // number that dictates their turn
 	Tiles  []byte                 `json:"-"`      // tiles currenty in possession
 	Score  int                    `json:"score"`  // current score in the game
-	State  chan GameStateResponse `json:"-"`      // channel on which to send state
+	State  chan GameStateResponse `json:"-"`      // channel on which to send state responses
+	Play   chan GameStateResponse `json:"-"`      // channel on which to send play responses
 }
 
 // TileBag represents the bag of undistributed tiles in a game
@@ -64,14 +66,13 @@ var initializedTileBag = initializeTileBag()
 // ScrabbleGame represents the state of an active game instance
 type ScrabbleGame struct {
 	sync.Mutex
-	ID         uuid.UUID             // unique identifier
-	Active     bool                  // true if the game has started
-	Action     chan GamePlayRequest  // channel for receiving player's turns
-	TurnCount  int                   // counter that increments for each turn played
-	Board      ScrabbleBoard         // board representation with current tiles
-	TileBag    TileBag               // bag of tiles not yet distributed
-	Players    map[uuid.UUID]*Player // players indexed by UUID
-	PlayerList []*Player             // players ordered by turn for the GameStateResponse
+	ID        uuid.UUID             // unique identifier
+	Active    bool                  // true if the game has started
+	Action    chan GamePlayRequest  // channel for receiving player's turns
+	TurnCount int                   // counter that increments for each turn played
+	Board     ScrabbleBoard         // board representation with current tiles
+	TileBag   TileBag               // bag of tiles not yet distributed
+	Players   map[uuid.UUID]*Player // players indexed by UUID
 }
 
 // createScrabbleGame initializes a game instance
@@ -126,6 +127,21 @@ func (tb TileBag) shuffle() {
 	})
 }
 
+func (sg *ScrabbleGame) start() error {
+
+	if sg.Active {
+		return errors.New("Game has already started")
+	} else if len(sg.Players) < 2 {
+		return errors.New("At least two players needed to start game")
+	}
+
+	sg.Active = true
+
+	go sg.stateController()
+
+	return nil
+}
+
 // stateController is the main goroutine for the game that handles state
 // requests and play requests
 func (sg *ScrabbleGame) stateController() {
@@ -135,7 +151,8 @@ func (sg *ScrabbleGame) stateController() {
 		dealTiles(sg.Players[p], &sg.TileBag, 7)
 	}
 
-	sg.PlayerList = sg.playerList()
+	// Get ordered list of players to send to clients
+	playerList := sg.playerList()
 
 	numPlayers := len(sg.Players)
 
@@ -146,13 +163,26 @@ func (sg *ScrabbleGame) stateController() {
 			sg.Players[request.PlayerID].State <- GameStateResponse{
 				GameID:      sg.ID,
 				PlayerID:    request.PlayerID,
-				Players:     sg.PlayerList,
+				Players:     playerList,
 				Board:       sg.Board,
 				PlayerTurn:  sg.TurnCount % numPlayers,
 				PlayerTiles: sg.Players[request.PlayerID].Tiles,
 			}
 		}
 	}
+}
+
+func (sg *ScrabbleGame) request(r GamePlayRequest) (GameStateResponse, error) {
+
+	// Send request to game controller
+	sg.Action <- r
+
+	switch r.Play {
+	case false:
+		return <-sg.Players[r.PlayerID].State, nil
+	}
+
+	return GameStateResponse{}, errors.New("Play functionality not yet implemented")
 }
 
 // playerList generates an ordered list of players for consistency across all
@@ -163,6 +193,35 @@ func (sg *ScrabbleGame) playerList() []*Player {
 		p[sg.Players[player].Number] = sg.Players[player]
 	}
 	return p
+}
+
+// addPlayer checks that a new player can be added to the game, and adds the
+// player if so
+func (sg *ScrabbleGame) addPlayer(name string) (uuid.UUID, error) {
+
+	// Create player to be added to game
+	p := Player{
+		ID:    uuid.New(),
+		Name:  name,
+		Tiles: make([]byte, 0),
+		State: make(chan GameStateResponse),
+	}
+
+	playerCount := len(sg.Players)
+
+	// Check that game is valid to join
+	if playerCount == 4 {
+		return p.ID, errors.New("Maximum players reached for game")
+	} else if sg.Active {
+		return p.ID, errors.New("Game has already started")
+	}
+
+	// Assign player their number based on when they joined
+	p.Number = playerCount
+	// Add player to game
+	sg.Players[p.ID] = &p
+
+	return p.ID, nil
 }
 
 // printTiles prints the tiles in a player's hand
