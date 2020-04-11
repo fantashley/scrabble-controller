@@ -1,4 +1,4 @@
-package main
+package scrabbleserver
 
 import (
 	"encoding/json"
@@ -74,7 +74,7 @@ func createGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serverMu.Lock()
-	server.activeGames[newGame.ID] = &newGame
+	server.activeGames[newGame.ID] = newGame
 	serverMu.Unlock()
 
 	gameData, err := json.Marshal(resp)

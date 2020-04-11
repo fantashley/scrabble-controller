@@ -1,4 +1,4 @@
-package main
+package scrabbleserver
 
 import "fmt"
 
@@ -33,62 +33,62 @@ var initializedBoard = initializeScrabbleBoard()
 // squareTypes is a definition of the possible square types and the values they
 // hold
 var squareTypes = map[string]SquareType{
-	"plain": SquareType{
+	"plain": {
 		Name:             "plain",
 		LetterMultiplier: 1,
 		WordMultiplier:   1,
 	},
-	"star": SquareType{
+	"star": {
 		Name:             "star",
 		LetterMultiplier: 1,
 		WordMultiplier:   1,
 		Coordinates: []SquareCoordinate{
-			SquareCoordinate{Row: 7, Col: 7},
+			{Row: 7, Col: 7},
 		},
 	},
-	"doubleLetter": SquareType{
+	"doubleLetter": {
 		Name:             "doubleLetter",
 		LetterMultiplier: 2,
 		WordMultiplier:   1,
 		Coordinates: []SquareCoordinate{
-			SquareCoordinate{Row: 0, Col: 3},
-			SquareCoordinate{Row: 2, Col: 6},
-			SquareCoordinate{Row: 3, Col: 0},
-			SquareCoordinate{Row: 3, Col: 7},
-			SquareCoordinate{Row: 6, Col: 2},
-			SquareCoordinate{Row: 6, Col: 6},
-			SquareCoordinate{Row: 7, Col: 3},
+			{Row: 0, Col: 3},
+			{Row: 2, Col: 6},
+			{Row: 3, Col: 0},
+			{Row: 3, Col: 7},
+			{Row: 6, Col: 2},
+			{Row: 6, Col: 6},
+			{Row: 7, Col: 3},
 		},
 	},
-	"doubleWord": SquareType{
+	"doubleWord": {
 		Name:             "doubleWord",
 		LetterMultiplier: 1,
 		WordMultiplier:   2,
 		Coordinates: []SquareCoordinate{
-			SquareCoordinate{Row: 1, Col: 1},
-			SquareCoordinate{Row: 2, Col: 2},
-			SquareCoordinate{Row: 3, Col: 3},
-			SquareCoordinate{Row: 4, Col: 4},
+			{Row: 1, Col: 1},
+			{Row: 2, Col: 2},
+			{Row: 3, Col: 3},
+			{Row: 4, Col: 4},
 		},
 	},
-	"tripleLetter": SquareType{
+	"tripleLetter": {
 		Name:             "tripleLetter",
 		LetterMultiplier: 3,
 		WordMultiplier:   1,
 		Coordinates: []SquareCoordinate{
-			SquareCoordinate{Row: 1, Col: 5},
-			SquareCoordinate{Row: 5, Col: 1},
-			SquareCoordinate{Row: 5, Col: 5},
+			{Row: 1, Col: 5},
+			{Row: 5, Col: 1},
+			{Row: 5, Col: 5},
 		},
 	},
-	"tripleWord": SquareType{
+	"tripleWord": {
 		Name:             "tripleWord",
 		LetterMultiplier: 1,
 		WordMultiplier:   3,
 		Coordinates: []SquareCoordinate{
-			SquareCoordinate{Row: 0, Col: 0},
-			SquareCoordinate{Row: 0, Col: 7},
-			SquareCoordinate{Row: 7, Col: 0},
+			{Row: 0, Col: 0},
+			{Row: 0, Col: 7},
+			{Row: 7, Col: 0},
 		},
 	},
 }
