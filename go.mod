@@ -1,4 +1,4 @@
-module github.com/fantashley/scrabble-controller
+module github.com/fantashley/wordgame-controller
 
 go 1.14
 

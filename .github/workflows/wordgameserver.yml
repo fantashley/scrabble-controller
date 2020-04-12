@@ -1,4 +1,4 @@
-name: ScrabbleServer
+name: WordGameServer
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
         fi
 
     - name: Build
-      run: go build -v ./pkg/scrabbleserver
+      run: go build -v ./pkg/...
 
   test:
     name: Test
