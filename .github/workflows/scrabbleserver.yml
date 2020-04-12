@@ -56,4 +56,9 @@ jobs:
         fi
 
     - name: Run integration tests
-      run: go test ./pkg/...
+      run: go test -v -coverprofile=profile.cov ./pkg/...
+
+    - name: Send coverage
+      uses: shogo82148/actions-goveralls@v1
+      with:
+        path-to-profile: profile.cov
