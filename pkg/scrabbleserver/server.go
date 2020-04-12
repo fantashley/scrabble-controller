@@ -48,14 +48,14 @@ type GamePlayRequest struct {
 
 var (
 	serverMu sync.Mutex
-	server   scrabbleServer
+	server   = scrabbleServer{
+		activeGames: make(map[uuid.UUID]*ScrabbleGame),
+	}
 )
 
 // StartScrabbleServer is the function that is run to start the Scrabble HTTP
 // server
 func StartScrabbleServer(bindAddr string) error {
-	server.activeGames = make(map[uuid.UUID]*ScrabbleGame)
-
 	r := mux.NewRouter()
 	r.HandleFunc("/game/create", createGameHandler)
 	r.HandleFunc("/game/join", joinGameHandler)
@@ -103,7 +103,7 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve the game that matches ID requested
-	g, err = getGame(j.GameID, &w)
+	g, err = getGame(j.GameID, w)
 	if err != nil {
 		return
 	}
@@ -115,6 +115,7 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	playerID, err := g.addPlayer(*j.PlayerName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	j.PlayerID = &playerID
@@ -146,7 +147,7 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve game instance
-	g, err = getGame(j.GameID, &w)
+	g, err = getGame(j.GameID, w)
 	if err != nil {
 		return
 	}
@@ -177,7 +178,7 @@ func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve requested game
-	g, err := getGame(j.GameID, &w)
+	g, err := getGame(j.GameID, w)
 	if err != nil {
 		return
 	}
@@ -202,13 +203,13 @@ func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 
 // getGame is a concurrency-safe function that retrieves the requested game
 // instance from the list of active games on the server
-func getGame(gameID uuid.UUID, w *(http.ResponseWriter)) (*ScrabbleGame, error) {
+func getGame(gameID uuid.UUID, w http.ResponseWriter) (*ScrabbleGame, error) {
 	var g *ScrabbleGame
 	var ok bool
 	serverMu.Lock()
 	defer serverMu.Unlock()
 	if g, ok = server.activeGames[gameID]; !ok {
-		http.Error(*w, "No existing game with that ID", http.StatusBadRequest)
+		http.Error(w, "No existing game with that ID", http.StatusBadRequest)
 		return nil, errors.New("Game does not exist")
 	}
 	return g, nil
