@@ -1,4 +1,4 @@
-package scrabbleserver
+package wordgameserver
 
 import (
 	"encoding/json"
@@ -53,9 +53,9 @@ var (
 	}
 )
 
-// StartScrabbleServer is the function that is run to start the Scrabble HTTP
+// StartWordGameServer is the function that is run to start the Word Game HTTP
 // server
-func StartScrabbleServer(bindAddr string) error {
+func StartWordGameServer(bindAddr string) error {
 	r := mux.NewRouter()
 	r.HandleFunc("/game/create", createGameHandler)
 	r.HandleFunc("/game/join", joinGameHandler)

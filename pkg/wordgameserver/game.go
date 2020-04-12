@@ -1,4 +1,4 @@
-package scrabbleserver
+package wordgameserver
 
 import (
 	"fmt"
