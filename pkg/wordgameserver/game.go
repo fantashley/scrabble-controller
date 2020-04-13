@@ -1,7 +1,6 @@
 package wordgameserver
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -210,10 +209,10 @@ func (sg *ScrabbleGame) addPlayer(name string) (uuid.UUID, error) {
 	playerCount := len(sg.Players)
 
 	// Check that game is valid to join
-	if playerCount == 4 {
-		return p.ID, errors.New("Maximum players reached for game")
-	} else if sg.Active {
+	if sg.Active {
 		return p.ID, errors.New("Game has already started")
+	} else if playerCount == 4 {
+		return p.ID, errors.New("Maximum players reached for game")
 	}
 
 	// Assign player their number based on when they joined
@@ -222,9 +221,4 @@ func (sg *ScrabbleGame) addPlayer(name string) (uuid.UUID, error) {
 	sg.Players[p.ID] = &p
 
 	return p.ID, nil
-}
-
-// printTiles prints the tiles in a player's hand
-func printTiles(tiles []byte) {
-	fmt.Println(string(tiles))
 }
