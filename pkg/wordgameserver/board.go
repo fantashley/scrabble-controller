@@ -1,7 +1,5 @@
 package wordgameserver
 
-import "fmt"
-
 // SquareCoordinate represents a coordinate of a Scrabble board
 type SquareCoordinate struct {
 	Row int `json:"row"`
@@ -131,14 +129,4 @@ func initializeScrabbleBoard() ScrabbleBoard {
 	}
 
 	return sb
-}
-
-// print outputs the scrabble board square contents
-func (sb ScrabbleBoard) print() {
-	for _, row := range sb {
-		for _, col := range row {
-			fmt.Print(col.SquareType + " ")
-		}
-		fmt.Println()
-	}
 }
