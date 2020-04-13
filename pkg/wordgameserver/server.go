@@ -162,6 +162,7 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
 }
 
 // gameStateHandler handles requests for the game's current state. It will

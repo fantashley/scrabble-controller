@@ -149,3 +149,79 @@ func joinPlayer(gameID uuid.UUID, playerName string, joinCh chan *httptest.Respo
 
 	joinCh <- rr
 }
+
+func TestStartGameHandler(t *testing.T) {
+	newGame := createScrabbleGame()
+
+	serverMu.Lock()
+	server.activeGames[newGame.ID] = newGame
+	serverMu.Unlock()
+
+	playerNames := []string{
+		"ashley1",
+		"ashley2",
+		"ashley3",
+		"ashley4",
+	}
+
+	newGame.addPlayer(playerNames[0])
+
+	j := GeneralGameRequest{
+		GameID: newGame.ID,
+	}
+
+	payload, err := json.Marshal(j)
+	if err != nil {
+		t.Fatal("Failed to marshal JSON request object")
+	}
+
+	rr, err := startGame(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should fail with only one player
+	if c := rr.Code; c == http.StatusOK {
+		t.Fatal("Game should not start with one player")
+	}
+
+	// Add remaining players so game should start
+	for i := 1; i < len(playerNames); i++ {
+		newGame.addPlayer(playerNames[i])
+	}
+
+	rr, err = startGame(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Game should start successfully
+	if c := rr.Code; c != http.StatusOK {
+		t.Fatalf("Returned status code %v, expected %v",
+			c, http.StatusOK)
+	}
+
+	rr, err = startGame(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure it is unsuccessful if already started
+	if c := rr.Code; c == http.StatusOK {
+		t.Fatal("Second start attempt should have failed")
+	}
+}
+
+func startGame(payload []byte) (*httptest.ResponseRecorder, error) {
+	req, err := http.NewRequest("GET", "/game/start", bytes.NewBuffer(payload))
+	if err != nil {
+		return nil, errors.New("Failed to generate HTTP request for game start")
+	}
+
+	rr := httptest.NewRecorder()
+	h := http.HandlerFunc(startGameHandler)
+
+	h.ServeHTTP(rr, req)
+
+	return rr, nil
+}
