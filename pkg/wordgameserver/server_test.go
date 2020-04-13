@@ -225,3 +225,69 @@ func startGame(payload []byte) (*httptest.ResponseRecorder, error) {
 
 	return rr, nil
 }
+
+func TestGameStateHandler(t *testing.T) {
+
+	newGame := createScrabbleGame()
+	var playerID uuid.UUID
+	var err error
+
+	serverMu.Lock()
+	server.activeGames[newGame.ID] = newGame
+	serverMu.Unlock()
+
+	playerNames := []string{
+		"ashley1",
+		"ashley2",
+		"ashley3",
+		"ashley4",
+	}
+
+	for i := 0; i < len(playerNames); i++ {
+		playerID, err = newGame.addPlayer(playerNames[i])
+		if err != nil {
+			t.Fatal("Failed to add valid player to game")
+		}
+	}
+
+	newGame.start()
+
+	j := GeneralGameRequest{
+		GameID:   newGame.ID,
+		PlayerID: &playerID,
+	}
+
+	payload, err := json.Marshal(j)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := http.NewRequest("GET", "/game/state", bytes.NewBuffer(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	h := http.HandlerFunc(gameStateHandler)
+
+	h.ServeHTTP(rr, req)
+
+	if c := rr.Code; c != http.StatusOK {
+		t.Fatalf("Returned status code %v, expected %v", c, http.StatusOK)
+	}
+
+	var s GameStateResponse
+
+	err = json.NewDecoder(rr.Body).Decode(&s)
+	if err != nil {
+		t.Fatal("Response was not in correct format")
+	}
+
+	if s.Players[3].Name != playerNames[3] {
+		t.Fatalf("Expected player name %v, got %v", playerNames[3], s.Players[4].Name)
+	} else if s.PlayerTurn != 0 {
+		t.Fatalf("Game not in correct turn state")
+	} else if len(s.PlayerTiles) != 7 {
+		t.Fatal("Incorrect number of tiles for player")
+	}
+}
