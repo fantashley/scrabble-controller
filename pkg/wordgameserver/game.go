@@ -62,6 +62,8 @@ type TileBag []byte
 
 var initializedTileBag = initializeTileBag()
 
+const maxTiles = 7
+
 // ScrabbleGame represents the state of an active game instance
 type ScrabbleGame struct {
 	sync.Mutex
@@ -104,6 +106,26 @@ func dealTiles(p *Player, tb *TileBag, tileCount int) {
 	var tilesDealt []byte
 	tilesDealt, *tb = (*tb)[:tileCount], (*tb)[tileCount:]
 	p.Tiles = append(p.Tiles, tilesDealt...)
+}
+
+func removeTiles(p *Player, tiles []byte) error {
+	var tileFound bool
+	for _, t := range tiles {
+		tileFound = false
+		for i, pt := range p.Tiles {
+			// Check for matching tile in player's hand
+			if t == pt {
+				// Remove tile from player's hand
+				p.Tiles = append(p.Tiles[:i], p.Tiles[i+1:]...)
+				tileFound = true
+				break
+			}
+		}
+		if !tileFound {
+			return errors.New("Tile '" + string(t) + "' not in player's hand")
+		}
+	}
+	return nil
 }
 
 // initializeTileBag fills the tile bag with tiles before the game begins
@@ -153,25 +175,25 @@ func (sg *ScrabbleGame) stateController() {
 	// Get ordered list of players to send to clients
 	playerList := sg.playerList()
 
-	numPlayers := len(sg.Players)
-
 	// Loop on requests in queue
 	for request := range sg.Action {
 		switch request.Play {
 		case false: // Return the game state
-			sg.Players[request.PlayerID].State <- GameStateResponse{
-				GameID:      sg.ID,
-				PlayerID:    request.PlayerID,
-				Players:     playerList,
-				Board:       sg.Board,
-				PlayerTurn:  sg.TurnCount % numPlayers,
-				PlayerTiles: sg.Players[request.PlayerID].Tiles,
+			sg.Players[request.PlayerID].State <- sg.getState(request.PlayerID, playerList)
+		default: // Execute play
+			err := sg.executePlay(request)
+			gameState := sg.getState(request.PlayerID, playerList)
+			if err != nil {
+				gameState.Error = err
 			}
+			sg.Players[request.PlayerID].Play <- gameState
 		}
 	}
 }
 
 func (sg *ScrabbleGame) request(r GamePlayRequest) (GameStateResponse, error) {
+
+	var j GameStateResponse
 
 	// Send request to game controller
 	sg.Action <- r
@@ -179,9 +201,12 @@ func (sg *ScrabbleGame) request(r GamePlayRequest) (GameStateResponse, error) {
 	switch r.Play {
 	case false:
 		return <-sg.Players[r.PlayerID].State, nil
+	default:
+		if j = <-sg.Players[r.PlayerID].Play; j.Error != nil {
+			return j, j.Error
+		}
+		return j, nil
 	}
-
-	return GameStateResponse{}, errors.New("Play functionality not yet implemented")
 }
 
 // playerList generates an ordered list of players for consistency across all
@@ -192,6 +217,17 @@ func (sg *ScrabbleGame) playerList() []*Player {
 		p[sg.Players[player].Number] = sg.Players[player]
 	}
 	return p
+}
+
+func (sg *ScrabbleGame) getState(playerID uuid.UUID, playerList []*Player) GameStateResponse {
+	return GameStateResponse{
+		GameID:      sg.ID,
+		PlayerID:    playerID,
+		Players:     playerList,
+		Board:       sg.Board,
+		PlayerTurn:  sg.TurnCount % len(playerList),
+		PlayerTiles: sg.Players[playerID].Tiles,
+	}
 }
 
 // addPlayer checks that a new player can be added to the game, and adds the

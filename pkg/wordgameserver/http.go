@@ -42,6 +42,7 @@ type GamePlayRequest struct {
 	StartPos SquareCoordinate `json:"start_pos"`
 	EndPos   SquareCoordinate `json:"end_pos"`
 	Tiles    []byte           `json:"tiles"`
+	Blanks   []byte           `json:"blanks,omitempty"`
 	Swap     bool             `json:"swap"`
 	Play     bool             `json:"-"`
 }
