@@ -178,19 +178,43 @@ func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Retrieve requested game
+	// Send request to game controller
+	gameRequestHelper(GamePlayRequest{
+		GameID:   j.GameID,
+		PlayerID: *j.PlayerID,
+	}, w)
+}
+
+// gamePlayHandler handles requests from players to play a word. It will respond
+// using the GameStateResponse struct.
+func gamePlayHandler(w http.ResponseWriter, r *http.Request) {
+	var j GamePlayRequest
+
+	err := json.NewDecoder(r.Body).Decode(&j)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	gameRequestHelper(j, w)
+}
+
+// gameRequestHelper relays play and state requests to the game, since they are
+// the exact same flow
+func gameRequestHelper(j GamePlayRequest, w http.ResponseWriter) {
+	// Get game to send message to
 	g, err := getGame(j.GameID, w)
 	if err != nil {
 		return
 	}
 
-	// Send request to game controller
-	state, err := g.request(GamePlayRequest{
-		GameID:   j.GameID,
-		PlayerID: *j.PlayerID,
-	})
+	// Send state or play request and wait for response
+	state, err := g.request(j)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 
-	// Decode response with current game state details from game controller
+	// Return GameStateResponse as json
 	resp, err := json.Marshal(state)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
