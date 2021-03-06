@@ -1,17 +1,24 @@
 package wordgameserver
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
-type scrabbleServer struct {
-	activeGames map[uuid.UUID]*ScrabbleGame
+// WordGameServer is an instance that maintains an allowed word list
+// and a mapping of active word games
+type WordGameServer struct {
+	sync.Mutex
+	wordMap     map[string]struct{}
+	activeGames map[uuid.UUID]*WordGame
 }
 
 // GeneralGameRequest is the catch-all request format for client requests that
@@ -47,37 +54,42 @@ type GamePlayRequest struct {
 	Play     bool             `json:"-"`
 }
 
-var (
-	serverMu sync.Mutex
-	server   = scrabbleServer{
-		activeGames: make(map[uuid.UUID]*ScrabbleGame),
+// GetWordGameServer returns a newly initialized WordGameServer
+func GetWordGameServer(wordFile string) (*WordGameServer, error) {
+	wordMap, err := loadWords(wordFile)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to load word file. %v", err.Error())
 	}
-)
+	return &WordGameServer{
+		wordMap:     wordMap,
+		activeGames: make(map[uuid.UUID]*WordGame),
+	}, nil
+}
 
-// StartWordGameServer is the function that is run to start the Word Game HTTP
+// Start is the function that is run to start the Word Game HTTP
 // server
-func StartWordGameServer(bindAddr string) error {
+func (wgs *WordGameServer) Start(bindAddr string) error {
 	r := mux.NewRouter()
-	r.HandleFunc("/game/create", createGameHandler)
-	r.HandleFunc("/game/join", joinGameHandler)
-	r.HandleFunc("/game/start", startGameHandler)
-	r.HandleFunc("/game/state", gameStateHandler)
+	r.HandleFunc("/game/create", wgs.createGameHandler)
+	r.HandleFunc("/game/join", wgs.joinGameHandler)
+	r.HandleFunc("/game/start", wgs.startGameHandler)
+	r.HandleFunc("/game/state", wgs.gameStateHandler)
 
 	return http.ListenAndServe(bindAddr, r)
 }
 
 // createGameHandler handles API requests for creating a new Scrabble game
 // instance
-func createGameHandler(w http.ResponseWriter, r *http.Request) {
+func (wgs *WordGameServer) createGameHandler(w http.ResponseWriter, r *http.Request) {
 	newGame := createScrabbleGame()
 
 	resp := GeneralGameRequest{
 		GameID: newGame.ID,
 	}
 
-	serverMu.Lock()
-	server.activeGames[newGame.ID] = newGame
-	serverMu.Unlock()
+	wgs.Lock()
+	wgs.activeGames[newGame.ID] = newGame
+	wgs.Unlock()
 
 	gameData, err := json.Marshal(resp)
 	if err != nil {
@@ -92,9 +104,9 @@ func createGameHandler(w http.ResponseWriter, r *http.Request) {
 
 // joinGameHandler handles requests from players to join a specified game. It
 // also creates a player and returns their ID to the client.
-func joinGameHandler(w http.ResponseWriter, r *http.Request) {
+func (wgs *WordGameServer) joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	var j GeneralGameRequest
-	var g *ScrabbleGame
+	var g *WordGame
 
 	// Decode Game ID
 	err := json.NewDecoder(r.Body).Decode(&j)
@@ -104,7 +116,7 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve the game that matches ID requested
-	g, err = getGame(j.GameID, w)
+	g, err = wgs.getGame(j.GameID, w)
 	if err != nil {
 		return
 	}
@@ -136,9 +148,9 @@ func joinGameHandler(w http.ResponseWriter, r *http.Request) {
 // startGameHandler is a handler that will start a game upon request, marking it
 // as active and no longer joinable by other players. It also kicks off the
 // goroutine for the specified game.
-func startGameHandler(w http.ResponseWriter, r *http.Request) {
+func (wgs *WordGameServer) startGameHandler(w http.ResponseWriter, r *http.Request) {
 	var j GeneralGameRequest
-	var g *ScrabbleGame
+	var g *WordGame
 
 	// Decode Game ID
 	err := json.NewDecoder(r.Body).Decode(&j)
@@ -148,7 +160,7 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Retrieve game instance
-	g, err = getGame(j.GameID, w)
+	g, err = wgs.getGame(j.GameID, w)
 	if err != nil {
 		return
 	}
@@ -168,7 +180,7 @@ func startGameHandler(w http.ResponseWriter, r *http.Request) {
 
 // gameStateHandler handles requests for the game's current state. It will
 // respond using the GameStateResponse struct.
-func gameStateHandler(w http.ResponseWriter, r *http.Request) {
+func (wgs *WordGameServer) gameStateHandler(w http.ResponseWriter, r *http.Request) {
 	var j GeneralGameRequest
 
 	// Decode game ID and player ID. Player ID is needed so the server knows
@@ -180,7 +192,7 @@ func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send request to game controller
-	gameRequestHelper(GamePlayRequest{
+	wgs.gameRequestHelper(GamePlayRequest{
 		GameID:   j.GameID,
 		PlayerID: *j.PlayerID,
 	}, w)
@@ -188,7 +200,7 @@ func gameStateHandler(w http.ResponseWriter, r *http.Request) {
 
 // gamePlayHandler handles requests from players to play a word. It will respond
 // using the GameStateResponse struct.
-func gamePlayHandler(w http.ResponseWriter, r *http.Request) {
+func (wgs *WordGameServer) gamePlayHandler(w http.ResponseWriter, r *http.Request) {
 	var j GamePlayRequest
 
 	err := json.NewDecoder(r.Body).Decode(&j)
@@ -197,14 +209,14 @@ func gamePlayHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameRequestHelper(j, w)
+	wgs.gameRequestHelper(j, w)
 }
 
 // gameRequestHelper relays play and state requests to the game, since they are
 // the exact same flow
-func gameRequestHelper(j GamePlayRequest, w http.ResponseWriter) {
+func (wgs *WordGameServer) gameRequestHelper(j GamePlayRequest, w http.ResponseWriter) {
 	// Get game to send message to
-	g, err := getGame(j.GameID, w)
+	g, err := wgs.getGame(j.GameID, w)
 	if err != nil {
 		return
 	}
@@ -229,14 +241,35 @@ func gameRequestHelper(j GamePlayRequest, w http.ResponseWriter) {
 
 // getGame is a concurrency-safe function that retrieves the requested game
 // instance from the list of active games on the server
-func getGame(gameID uuid.UUID, w http.ResponseWriter) (*ScrabbleGame, error) {
-	var g *ScrabbleGame
+func (wgs *WordGameServer) getGame(gameID uuid.UUID, w http.ResponseWriter) (*WordGame, error) {
+	var g *WordGame
 	var ok bool
-	serverMu.Lock()
-	defer serverMu.Unlock()
-	if g, ok = server.activeGames[gameID]; !ok {
+	wgs.Lock()
+	defer wgs.Unlock()
+	if g, ok = wgs.activeGames[gameID]; !ok {
 		http.Error(w, "No existing game with that ID", http.StatusBadRequest)
 		return nil, errors.New("Game does not exist")
 	}
 	return g, nil
+}
+
+func loadWords(filePath string) (map[string]struct{}, error) {
+	wordMap := make(map[string]struct{})
+	empty := struct{}{}
+	file, err := os.Open(filePath)
+	if err != nil {
+		return wordMap, err
+	}
+	defer file.Close()
+
+	wordScanner := bufio.NewScanner(file)
+	for wordScanner.Scan() {
+		wordMap[wordScanner.Text()] = empty
+	}
+
+	if err := wordScanner.Err(); err != nil {
+		return wordMap, err
+	}
+
+	return wordMap, nil
 }

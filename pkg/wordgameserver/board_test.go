@@ -1,7 +1,6 @@
 package wordgameserver
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -15,14 +14,18 @@ func TestBoard(t *testing.T) {
 		"plain":        164,
 	}
 
-	count := make(map[string]int)
 	for _, row := range initializedBoard {
 		for _, square := range row {
-			count[square.SquareType]++
+			if squareType, ok := occurrences[square.SquareType]; !ok {
+				t.Fatalf("Too many of square type %v", squareType)
+			}
+			occurrences[square.SquareType]--
+			if occurrences[square.SquareType] == 0 {
+				delete(occurrences, square.SquareType)
+			}
 		}
 	}
-
-	if !reflect.DeepEqual(occurrences, count) {
-		t.Error("Scrabble board does not have correct square counts")
+	if len(occurrences) != 0 {
+		t.Fatalf("Length of occurrences is %v but should be 0", len(occurrences))
 	}
 }

@@ -64,8 +64,8 @@ var initializedTileBag = initializeTileBag()
 
 const maxTiles = 7
 
-// ScrabbleGame represents the state of an active game instance
-type ScrabbleGame struct {
+// WordGame represents the state of an active game instance
+type WordGame struct {
 	sync.Mutex
 	ID        uuid.UUID             // unique identifier
 	Active    bool                  // true if the game has started
@@ -77,9 +77,9 @@ type ScrabbleGame struct {
 }
 
 // createScrabbleGame initializes a game instance
-func createScrabbleGame() *ScrabbleGame {
+func createScrabbleGame() *WordGame {
 
-	game := ScrabbleGame{}
+	game := WordGame{}
 
 	game.ID = uuid.New()
 
@@ -148,61 +148,61 @@ func (tb TileBag) shuffle() {
 	})
 }
 
-func (sg *ScrabbleGame) start() error {
+func (wg *WordGame) start() error {
 
-	if sg.Active {
+	if wg.Active {
 		return errors.New("Game has already started")
-	} else if len(sg.Players) < 2 {
+	} else if len(wg.Players) < 2 {
 		return errors.New("At least two players needed to start game")
 	}
 
-	sg.Active = true
+	wg.Active = true
 
-	go sg.stateController()
+	go wg.stateController()
 
 	return nil
 }
 
 // stateController is the main goroutine for the game that handles state
 // requests and play requests
-func (sg *ScrabbleGame) stateController() {
+func (wg *WordGame) stateController() {
 
 	// Deal tiles to players
-	for p := range sg.Players {
-		dealTiles(sg.Players[p], &sg.TileBag, 7)
+	for p := range wg.Players {
+		dealTiles(wg.Players[p], &wg.TileBag, 7)
 	}
 
 	// Get ordered list of players to send to clients
-	playerList := sg.playerList()
+	playerList := wg.playerList()
 
 	// Loop on requests in queue
-	for request := range sg.Action {
+	for request := range wg.Action {
 		switch request.Play {
 		case false: // Return the game state
-			sg.Players[request.PlayerID].State <- sg.getState(request.PlayerID, playerList)
+			wg.Players[request.PlayerID].State <- wg.getState(request.PlayerID, playerList)
 		default: // Execute play
-			err := sg.executePlay(request)
-			gameState := sg.getState(request.PlayerID, playerList)
+			err := wg.executePlay(request)
+			gameState := wg.getState(request.PlayerID, playerList)
 			if err != nil {
 				gameState.Error = err
 			}
-			sg.Players[request.PlayerID].Play <- gameState
+			wg.Players[request.PlayerID].Play <- gameState
 		}
 	}
 }
 
-func (sg *ScrabbleGame) request(r GamePlayRequest) (GameStateResponse, error) {
+func (wg *WordGame) request(r GamePlayRequest) (GameStateResponse, error) {
 
 	var j GameStateResponse
 
 	// Send request to game controller
-	sg.Action <- r
+	wg.Action <- r
 
 	switch r.Play {
 	case false:
-		return <-sg.Players[r.PlayerID].State, nil
+		return <-wg.Players[r.PlayerID].State, nil
 	default:
-		if j = <-sg.Players[r.PlayerID].Play; j.Error != nil {
+		if j = <-wg.Players[r.PlayerID].Play; j.Error != nil {
 			return j, j.Error
 		}
 		return j, nil
@@ -211,28 +211,28 @@ func (sg *ScrabbleGame) request(r GamePlayRequest) (GameStateResponse, error) {
 
 // playerList generates an ordered list of players for consistency across all
 // clients
-func (sg *ScrabbleGame) playerList() []*Player {
-	p := make([]*Player, len(sg.Players))
-	for player := range sg.Players {
-		p[sg.Players[player].Number] = sg.Players[player]
+func (wg *WordGame) playerList() []*Player {
+	p := make([]*Player, len(wg.Players))
+	for player := range wg.Players {
+		p[wg.Players[player].Number] = wg.Players[player]
 	}
 	return p
 }
 
-func (sg *ScrabbleGame) getState(playerID uuid.UUID, playerList []*Player) GameStateResponse {
+func (wg *WordGame) getState(playerID uuid.UUID, playerList []*Player) GameStateResponse {
 	return GameStateResponse{
-		GameID:      sg.ID,
+		GameID:      wg.ID,
 		PlayerID:    playerID,
 		Players:     playerList,
-		Board:       sg.Board,
-		PlayerTurn:  sg.TurnCount % len(playerList),
-		PlayerTiles: sg.Players[playerID].Tiles,
+		Board:       wg.Board,
+		PlayerTurn:  wg.TurnCount % len(playerList),
+		PlayerTiles: wg.Players[playerID].Tiles,
 	}
 }
 
 // addPlayer checks that a new player can be added to the game, and adds the
 // player if so
-func (sg *ScrabbleGame) addPlayer(name string) (uuid.UUID, error) {
+func (wg *WordGame) addPlayer(name string) (uuid.UUID, error) {
 
 	// Create player to be added to game
 	p := Player{
@@ -242,10 +242,10 @@ func (sg *ScrabbleGame) addPlayer(name string) (uuid.UUID, error) {
 		State: make(chan GameStateResponse),
 	}
 
-	playerCount := len(sg.Players)
+	playerCount := len(wg.Players)
 
 	// Check that game is valid to join
-	if sg.Active {
+	if wg.Active {
 		return p.ID, errors.New("Game has already started")
 	} else if playerCount == 4 {
 		return p.ID, errors.New("Maximum players reached for game")
@@ -254,7 +254,7 @@ func (sg *ScrabbleGame) addPlayer(name string) (uuid.UUID, error) {
 	// Assign player their number based on when they joined
 	p.Number = playerCount
 	// Add player to game
-	sg.Players[p.ID] = &p
+	wg.Players[p.ID] = &p
 
 	return p.ID, nil
 }
